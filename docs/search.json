@@ -1,0 +1,16 @@
+[
+  {
+    "objectID": "ST502_HW6.html",
+    "href": "ST502_HW6.html",
+    "title": "ST502 HW6 - Bayesian Project",
+    "section": "",
+    "text": "x &lt;- matrix(nrow=3, ncol=2)\nx\n\n     [,1] [,2]\n[1,]   NA   NA\n[2,]   NA   NA\n[3,]   NA   NA\n\n\n\nx[1,2] = 5\nx\n\n     [,1] [,2]\n[1,]   NA    5\n[2,]   NA   NA\n[3,]   NA   NA"
+  },
+  {
+    "objectID": "ST502_HW6.html#task-1--",
+    "href": "ST502_HW6.html#task-1--",
+    "title": "ST502 HW6 - Bayesian Project",
+    "section": "",
+    "text": "x &lt;- matrix(nrow=3, ncol=2)\nx\n\n     [,1] [,2]\n[1,]   NA   NA\n[2,]   NA   NA\n[3,]   NA   NA\n\n\n\nx[1,2] = 5\nx\n\n     [,1] [,2]\n[1,]   NA    5\n[2,]   NA   NA\n[3,]   NA   NA"
+  }
+]

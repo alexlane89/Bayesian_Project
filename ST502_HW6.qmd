@@ -1,0 +1,22 @@
+---
+title: "ST502 HW6 - Bayesian Project"
+author: "Charles Lane"
+format: html
+editor: visual
+---
+
+## Task 1 - 
+
+### 5 - *Rewrite the following nested function call using baseR’s chaining operator:*
+
+```{r}
+x <- matrix(nrow=3, ncol=2)
+x
+```
+
+```{r}
+x[1,2] = 5
+x
+```
+
+### 6 - *What
