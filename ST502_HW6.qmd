@@ -14,10 +14,20 @@ d_data = read.csv('diabetes-dataset.csv')
 head(d_data)
 ```
 
+> Clean data to remove glucose readings of 0.
+
+```{r}
+d_data$Glucose[d_data$Glucose == 0] <- NA
+d_data <- d_data[complete.cases(d_data),]
+head(d_data)
+```
+
+
 > create a matrix to fill with iterated B0, B1 values.
 
 ```{r}
 g_mat <- matrix(NA, nrow=6000,ncol = 2)
+colnames(g_mat) <- c('Beta0','Beta1')
 head(g_mat)
 ```
 ### Determine regression variables
@@ -25,12 +35,7 @@ head(g_mat)
 > Determine the jumping distribution(s) for Beta0 & Beta1
 
 ```{r}
-# Find beta0 holding beta1 constant
-b0.t <- 0
-b0.s <- rnorm(1, 0, 0.2)
 
-i = 1
-beta.pos[i+1,1] <- b0.t
 ```
 
 
@@ -43,6 +48,69 @@ posterior = function(b0, b1, gluc, outcome){
 }
 ```
 
+> Practice to help with troubleshooting and ensure function works
+
+```{r}
+b0 <- matrix(NA, nrow = 10 #nsample
+             ,ncol = 1)
+b1 <- matrix(NA, nrow = 10 #nsample
+             , ncol = 1)
+colnames(g_mat) <- c('Beta0','Beta1')
+b0[1] <- 0.1 #initb0
+b1[1] <- 0.1 #initb1
+
+```
+
+> Further practice including the for loop
+
+```{r}
+for(i in 2:10 #nsample
+    ){
+  #Determine candidate value for Beta0 'b0'
+  #temporary value for current beta is previous beta
+  currentb0 <- b0[i-1]
+  
+  #get the next random draw 
+  newb0 <- currentb0 + rnorm(1, 0, 0.2#JSD
+                             ^2)
+  #Complete ln(R) to determine if b0 candidate is to be accepted
+  ln_r_a <- (log(newb0) + log(b1[i-1]) + log(-posterior(b0=newb0, b1=b1[i-1], gluc = d_data$Glucose, 
+                                              outcome = d_data$Outcome)))
+  ln_r_b <- (log(b0[i-1]) + log(b1[i-1]) + log(-posterior(b0 = currentb0, b1 = b1[i-1], gluc = d_data$Glucose,
+                                             outcome = d_data$Outcome)))
+  ln_r <-  ln_r_a - ln_r_b
+          
+  #Determine if to accept b0.s value based on ln(r)
+  if(log(runif(1)) < ln_r){
+      b0[i] <- newb0      # accept move with probability min(1,r)
+    } else {
+      b0[i] <- currentb0  # otherwise "reject" move, and stay where we are
+    } #end if's
+  
+  #Determine candidate value for Beta1 'b1'
+  #temporary value for current beta is previous beta
+    currentb1 <- b1[i-1]
+    
+    #get the next random draw 
+    newb1 <- currentb1 + rnorm(1, 0, (0.2#JSD
+                                      /10)^2)
+  #Complete ln(R) to determine if b0 candidate is to be accepted
+  ln_r <- (log(b0[i]) + log(newb1) + log(-posterior(b0=b0[i], b1=newb1, gluc = d_data$Glucose, 
+                                              outcome = d_data$Outcome))) - 
+          (log(b0[i]) + log(b1[i-1]) + log(-posterior(b0 = b0[i], b1 = b1[i-1], gluc = d_data$Glucose,
+                                             outcome = d_data$Outcome)))
+  #Determine if to accept b0.s value based on ln(r)
+  if(log(runif(1)) < ln_r){
+      b1[i] <- newb1      # accept move with probability min(1,r)
+    } else {
+      b1[i] <- currentb1  # otherwise "reject" move, and stay where we are
+    } #end if's
+}
+
+x <- data.frame(b0, b1)
+x
+```
+
 > Write a sampler function to draw 'nsample' posterior samples of beta0, beta1
 
 ```{r}
@@ -52,9 +120,11 @@ posterior = function(b0, b1, gluc, outcome){
 #outcome = diabetes outcome (binary 0/1)
 #nsample = number of posterior samples from distribution
 #JSD = Jumping Distribution standard deviation
-post_sample = function(b0, b1, gluc, outcome, nsample, JSD)
-  b0[1] <- 0
-  b1[1] <- 0
+post_sample = function(initb0, initb1, gluc, outcome, nsample, JSD){
+  b0 <- matrix(NA, nrow = nsample, ncol = 1)
+  b1 <- matrix(NA, nrow = nsample, ncol = 1)
+  b0[1] <- initb0
+  b1[1] <- initb1
   for(i in 2:nsample){
   #Determine candidate value for Beta0 'b0'
   #temporary value for current beta is previous beta
@@ -63,12 +133,12 @@ post_sample = function(b0, b1, gluc, outcome, nsample, JSD)
     #get the next random draw 
     newb0 <- currentb0 + rnorm(1, 0, JSD^2)
   #Complete ln(R) to determine if b0 candidate is to be accepted
-  ln_r <- (log(newb0) + log(b1[i-1]) + log(posterior(b0=newb0, b1=b1[i-1], gluc = gluc, 
+  ln_r <- (log(newb0) + log(b1[i-1]) + log(-posterior(b0=newb0, b1=b1[i-1], gluc = gluc, 
                                               outcome = outcome))) - 
-          (log(b0) + log(b1) + log(posterior(b0 = currentb0, b1 = b1[i-1], gluc = gluc,
+          (log(b0[i-1]) + log(b1[i-1]) + log(-posterior(b0 = currentb0, b1 = b1[i-1], gluc = gluc,
                                              outcome = outcome)))
   #Determine if to accept b0.s value based on ln(r)
-  if(log(runif(1))<ln_r){
+  if(log(runif(1)) < ln_r){
       b0[i] <- newb0      # accept move with probability min(1,r)
     } else {
       b0[i] <- currentb0  # otherwise "reject" move, and stay where we are
@@ -81,193 +151,50 @@ post_sample = function(b0, b1, gluc, outcome, nsample, JSD)
     #get the next random draw 
     newb1 <- currentb1 + rnorm(1, 0, (JSD/10)^2)
   #Complete ln(R) to determine if b0 candidate is to be accepted
-  ln_r <- (log(b0[i]) + log(newb1) + log(posterior(b0=b0[i], b1=newb1, gluc = gluc, 
+  ln_r <- (log(b0[i]) + log(newb1) + log(-posterior(b0=b0[i], b1=newb1, gluc = gluc, 
                                               outcome = outcome))) - 
-          (log(b0) + log(b1) + log(posterior(b0 = b0[i], b1 = b1[i-1], gluc = gluc,
+          (log(b0[i]) + log(b1[i-1]) + log(-posterior(b0 = b0[i], b1 = b1[i-1], gluc = gluc,
                                              outcome = outcome)))
   #Determine if to accept b0.s value based on ln(r)
-  if(log(runif(1))<ln_r){
+  if(log(runif(1)) < ln_r){
       b1[i] <- newb1      # accept move with probability min(1,r)
     } else {
       b1[i] <- currentb1  # otherwise "reject" move, and stay where we are
     } #end if's
   }
+  return(data.frame(Beta0 = b0,Beta1 = b1))
+}
 ```
 
 > Run the sampler function with a sample size of 6000 and a 'burn-in' of 1000.
 
 ```{r}
+result <- post_sample(initb0 = 0.1, initb1 = 0.1, gluc = d_data$Glucose,
+                     outcome = d_data$Outcome, nsample = 10, JSD = 0.2)
 
 ```
 
+> Identify a burnin in to reduce depdency on the first estimated values of b0 & b1,
+> then calculate the mean and standard deviations for each Beta estimator from their
+> generated distributions.
 
 ```{r}
-#############################################
-##Page 98-101 code
-#############################################
+burnin <- 2
 
-#Create Uniform Prior function to show the process for having a prior in a function
-prior = function(theta){
-  if((theta < 0) || (theta > 1)){ 
-    return(0)
-  }else{
-    return(1)
-  }
-}
+m <- c(mean(result$Beta0[-c(1:burnin)]), mean(result$Beta1[-c(1:burnin)]))
+s <- c(sd(result$Beta0[-c(1:burnin)]), sd(result$Beta1[-c(1:burnin)]))
 
-#Binomial distribution for y|theta (ignoring the constant wrt theta)
-likelihood = function(theta, y,n){
-  return(theta^(y) * (1-theta)^(n-y))
-}
+data.frame('Posterior Mean' = m, 'Posterior SD' = s, row.names = c('Beta0', 'Beta1'))
+```
+> Determine the equal tail credible interval for the above 2 Beta posterior distributions
 
-#Create a function that takes in an observed y, sample size n, number of iterations to run and 
-#starting values for parameter theta and the "jumping distribution's" sd
-thetasampler <- function(y, n, niter, thetastartval, thetaproposalsd){
-  
-  #vector to store sampled theta's
-  theta <- rep(0 , niter)
-  #use the starting value as the first theta
-  theta[1] <- thetastartval
-  
-  #loop through the desired number of iterations
-  for(i in 2:niter){
-    #temporary value for current theta is previous theta
-    currenttheta <- theta[i-1]
-    
-    #get the next random draw 
-    newtheta <- currenttheta + rnorm(1, 0, thetaproposalsd)
-    
-    #Find r ratio: 
-    r <- prior(theta = newtheta)*likelihood(theta = newtheta, y = y, n = n)/
-      (prior(theta = currenttheta)*likelihood(theta = currenttheta, y = y, n = n))
-    
-    #accept this new value with prob min(1,r)
-    if(runif(1)<r){
-      theta[i] <- newtheta      # accept move with probabily min(1,r)
-    } else {
-      theta[i] <- currenttheta  # otherwise "reject" move, and stay where we are
-    } #end if's
-  } #end loop 
-  #return the vector of theta values	
-  return(theta)
-} #end function
-
-# running this sample for y=13, n = 20.
-randomDraws <- thetasampler(y = 13, 
-                            n = 20,
-                            niter = 50000,
-                            thetastartval = 0.1,
-                            thetaproposalsd = 0.1)
-
+```{r}
+# Equal tail intervals using quantiles for Beta0
+quantile(c(0.025, 0.975), x = result$Beta0[-c(1:burnin)])
 ```
 
-
-### Bayesian Calculation
-
 ```{r}
-#################################################
-##Page 88-92
-##Computing bayesian estimates and credible intervals
-###################################################
-
-#sample size
-n<-50
-#Set alpha/beta for prior that is uniform
-alpha <- 1
-beta <- 1
-#Set alpha/beta for prior that is informative
-# alpha <- 20
-# beta <- 2
-
-#number of successes
-y <- 3
-
-par(mfrow = c(1, 2))
-#Plot means of poseteriors
-#First a plot of the prior density
-curve(dbeta(x, 
-            shape1 = alpha,
-            shape2 = beta),
-      main = paste("Prior~Beta(", alpha, ",", beta, ")", sep = ""),
-      xlab = "theta",
-      ylab = "f(theta)",
-      ylim = c(0,1.2))
-abline(v = alpha/(alpha+beta),
-       lwd = "3",
-       col = "Green")
-legend(x = "topleft",
-       col = c("green"), 
-       legend = c("Prior Mean"),
-       pch = 10)
-
-#Plot of the posterior
-curve(dbeta(x,
-            shape1 = alpha + y,
-            shape2 = beta + n - y),
-      main = paste("Posterior with (theta-hat=", 
-                   round(y/n, 3), ",\nn=", n, ")", sep=""),
-      xlab = paste("theta  Posterior Var =", 
-                   round((alpha + y)*(beta + n - y)/((alpha + beta + n)^2*(alpha + beta + n + 1)), 5), 
-                   sep = ""),
-      ylab = "f(theta|y)")
-abline(v = alpha/(alpha+beta),
-       lwd = "3",
-       col = "Green")
-abline(v = y/n,
-       lwd = "2",
-       col = "Blue")
-abline(v = (alpha + y)/(alpha + beta + n),
-       lwd = "2",
-       col = "Black")
-legend(x = "topright",
-       col = c("Green", "Blue", "Black"),
-       legend = c("Prior Mean", "Sample Mean", "Posterior Mean"),
-       pch = 15)
-
-
-#Set alpha/beta for prior that is informative
-alpha <- 20
-beta <- 2
-
-#number of successes
-y <- 3
-
-par(mfrow = c(1,2))
-#Plot means of poseteriors
-#First a plot of the prior density
-curve(dbeta(x, 
-            shape1 = alpha,
-            shape2 = beta),
-      main = paste("Prior~Beta(", alpha, ",", beta, ")", sep = ""),
-      xlab = "theta",
-      ylab = "f(theta)")
-abline(v = alpha/(alpha+beta),
-       lwd = "3",
-       col = "Green")
-legend(x = "topleft",
-       col = c("green"), 
-       legend = c("Prior Mean"),
-       pch = 10)
-
-#Plot of the posterior
-curve(dbeta(x,
-            shape1 = alpha + y,
-            shape2 = beta + n - y),
-      main = paste("Posterior with (theta-hat=", round(y/n, 3), ",\nn=", n, ")", sep=""),
-      xlab = paste("theta  Posterior Var =", round((alpha + y)*(beta + n - y)/((alpha + beta + n)^2*(alpha + beta + n + 1)), 5), sep = ""),
-      ylab = "f(theta|y)")
-abline(v = alpha/(alpha+beta),
-       lwd = "3",
-       col = "Green")
-abline(v = y/n,
-       lwd = "2",
-       col = "Blue")
-abline(v = (alpha + y)/(alpha + beta + n),
-       lwd = "2",
-       col = "Black")
-legend(x = "topright",
-       col = c("Green", "Blue", "Black"),
-       legend = c("Prior Mean", "Sample Mean", "Posterior Mean"),
-       pch = 15)
+# Equal tail intervals using quantiles for Beta1
+quantile(c(0.025, 0.975), x = result$Beta1[-c(1:burnin)])
 ```
 
