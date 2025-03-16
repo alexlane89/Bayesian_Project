@@ -32,13 +32,6 @@ head(g_mat)
 ```
 ### Determine regression variables
 
-> Determine the jumping distribution(s) for Beta0 & Beta1
-
-```{r}
-
-```
-
-
 > Write a function to create the log posterior values
 
 ```{r}
@@ -196,5 +189,59 @@ quantile(c(0.025, 0.975), x = result$Beta0[-c(1:burnin)])
 ```{r}
 # Equal tail intervals using quantiles for Beta1
 quantile(c(0.025, 0.975), x = result$Beta1[-c(1:burnin)])
+```
+
+## Task 2 - Using MCMCpack R package
+
+```{r}
+library('coda')
+library('MASS')
+library('MCMCpack')
+
+```
+
+> Use the MCMClogit function in the MCMCpack package to perform the Bayesian
+analysis outlined in Task 1.
+
+```{r}
+post = MCMClogit(d_data$Outcome ~ d_data$Glucose, seed=30, burnin = 1000, mcmc=5000,
+b0 = 0, B0 = 1, data= d_data)
+colnames(post) <- c('Beta0', 'Beta1')
+
+head(post)
+```
+
+> Plots of the above
+
+```{r}
+plot(post)
+```
+
+> Generate summary statistics
+
+```{r}
+summary(post)
+```
+
+> Now make it a dataframe!
+
+```{r}
+post = data.frame(post)
+```
+
+# What are the differences between the results of Task 1 & Task 2?
+> In Task 1 - 
+> In Task 2 - 
+
+> Predict Diabetes status based on the calculated posterior B0 & B1 values, 
+then plot against the reported diabetes status values.
+
+```{r}
+comparison <- data.frame(
+  'Glucose' = d_data$Glucose,
+  'Predicted Value' = posterior(b0 = mean(post$Beta0),b1 = mean(post$Beta1), gluc = d_data$Glucose, outcome = d_data$Outcome),
+  'Actual Value' = d_data$Outcome)
+
+head(comparison)
 ```
 
