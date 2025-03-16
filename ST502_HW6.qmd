@@ -22,6 +22,85 @@ head(g_mat)
 ```
 ### Determine regression variables
 
+> Determine the jumping distribution(s) for Beta0 & Beta1
+
+```{r}
+# Find beta0 holding beta1 constant
+b0.t <- 0
+b0.s <- rnorm(1, 0, 0.2)
+
+i = 1
+beta.pos[i+1,1] <- b0.t
+```
+
+
+> Write a function to create the log posterior values
+
+```{r}
+posterior = function(b0, b1, gluc, outcome){
+  return(sum(log(dbinom(outcome, 1, 
+                        exp(b0+b1*gluc)/(1+exp(b0+b1*gluc))))))
+}
+```
+
+> Write a sampler function to draw 'nsample' posterior samples of beta0, beta1
+
+```{r}
+#b0 = Beta0 estimator
+#b1 = Beta1 estimator
+#gluc = predictor 'x' value of glucose
+#outcome = diabetes outcome (binary 0/1)
+#nsample = number of posterior samples from distribution
+#JSD = Jumping Distribution standard deviation
+post_sample = function(b0, b1, gluc, outcome, nsample, JSD)
+  b0[1] <- 0
+  b1[1] <- 0
+  for(i in 2:nsample){
+  #Determine candidate value for Beta0 'b0'
+  #temporary value for current beta is previous beta
+    currentb0 <- b0[i-1]
+    
+    #get the next random draw 
+    newb0 <- currentb0 + rnorm(1, 0, JSD^2)
+  #Complete ln(R) to determine if b0 candidate is to be accepted
+  ln_r <- (log(newb0) + log(b1[i-1]) + log(posterior(b0=newb0, b1=b1[i-1], gluc = gluc, 
+                                              outcome = outcome))) - 
+          (log(b0) + log(b1) + log(posterior(b0 = currentb0, b1 = b1[i-1], gluc = gluc,
+                                             outcome = outcome)))
+  #Determine if to accept b0.s value based on ln(r)
+  if(log(runif(1))<ln_r){
+      b0[i] <- newb0      # accept move with probability min(1,r)
+    } else {
+      b0[i] <- currentb0  # otherwise "reject" move, and stay where we are
+    } #end if's
+  
+  #Determine candidate value for Beta1 'b1'
+  #temporary value for current beta is previous beta
+    currentb1 <- b1[i-1]
+    
+    #get the next random draw 
+    newb1 <- currentb1 + rnorm(1, 0, (JSD/10)^2)
+  #Complete ln(R) to determine if b0 candidate is to be accepted
+  ln_r <- (log(b0[i]) + log(newb1) + log(posterior(b0=b0[i], b1=newb1, gluc = gluc, 
+                                              outcome = outcome))) - 
+          (log(b0) + log(b1) + log(posterior(b0 = b0[i], b1 = b1[i-1], gluc = gluc,
+                                             outcome = outcome)))
+  #Determine if to accept b0.s value based on ln(r)
+  if(log(runif(1))<ln_r){
+      b1[i] <- newb1      # accept move with probability min(1,r)
+    } else {
+      b1[i] <- currentb1  # otherwise "reject" move, and stay where we are
+    } #end if's
+  }
+```
+
+> Run the sampler function with a sample size of 6000 and a 'burn-in' of 1000.
+
+```{r}
+
+```
+
+
 ```{r}
 #############################################
 ##Page 98-101 code
