@@ -32,13 +32,39 @@ head(g_mat)
 ```
 ### Determine regression variables
 
+> Write an expit / probability function. This is for particular glucose values, 
+not a series.
+
+```{r}
+expit = function(b0, b1, gluc){
+  x <- exp(b0 + b1*gluc)/(1 + exp(b0 + b1*gluc))
+  return(x)
+}
+```
+
+> Check expit function
+
+```{r}
+expit(0.1, 0.01, 10)
+```
+
+
 > Write a function to create the log posterior values
 
 ```{r}
 posterior = function(b0, b1, gluc, outcome){
-  return(sum(log(dbinom(outcome, 1, 
-                        exp(b0+b1*gluc)/(1+exp(b0+b1*gluc))))))
+  pp <- c()
+  for(i in 1:length(d_data)){
+    pp[i] <- expit(b0, b1, gluc[i])
+  }
+  return(sum(dbinom(outcome, 1, pp, log = TRUE)))
 }
+```
+
+> Check the posterior function
+
+```{r}
+posterior(0, 0, d_data$Glucose, d_data$Outcome)
 ```
 
 > Practice to help with troubleshooting and ensure function works
@@ -67,10 +93,14 @@ for(i in 2:10 #nsample
   newb0 <- currentb0 + rnorm(1, 0, 0.2#JSD
                              ^2)
   #Complete ln(R) to determine if b0 candidate is to be accepted
-  ln_r_a <- (log(newb0) + log(b1[i-1]) + log(-posterior(b0=newb0, b1=b1[i-1], gluc = d_data$Glucose, 
-                                              outcome = d_data$Outcome)))
-  ln_r_b <- (log(b0[i-1]) + log(b1[i-1]) + log(-posterior(b0 = currentb0, b1 = b1[i-1], gluc = d_data$Glucose,
-                                             outcome = d_data$Outcome)))
+  ln_r_a <- (log(newb0) + log(b1[i-1]) + log(-posterior(b0=newb0, 
+                                                        b1=b1[i-1], 
+                                                        gluc = d_data$Glucose, 
+                                                        outcome = d_data$Outcome)))
+  ln_r_b <- (log(b0[i-1]) + log(b1[i-1]) + log(-posterior(b0 = currentb0,
+                                                          b1 = b1[i-1], 
+                                                          gluc = d_data$Glucose,
+                                                          outcome = d_data$Outcome)))
   ln_r <-  ln_r_a - ln_r_b
           
   #Determine if to accept b0.s value based on ln(r)
@@ -126,10 +156,18 @@ post_sample = function(initb0, initb1, gluc, outcome, nsample, JSD){
     #get the next random draw 
     newb0 <- currentb0 + rnorm(1, 0, JSD^2)
   #Complete ln(R) to determine if b0 candidate is to be accepted
-  ln_r <- (log(newb0) + log(b1[i-1]) + log(-posterior(b0=newb0, b1=b1[i-1], gluc = gluc, 
-                                              outcome = outcome))) - 
-          (log(b0[i-1]) + log(b1[i-1]) + log(-posterior(b0 = currentb0, b1 = b1[i-1], gluc = gluc,
-                                             outcome = outcome)))
+  ln_r <- (dnorm(newb0, 0, 15, log = TRUE) + 
+             dnorm(b1[i-1], 0, 15, log = TRUE) + 
+             log(-posterior(b0=newb0, 
+                            b1=b1[i-1], 
+                            gluc = gluc, 
+                            outcome = outcome))) - 
+          (dnorm(b0[i-1], 0, 15, log = TRUE) + 
+             dnorm(b1[i-1], 0, 15, log = TRUE) + 
+             log(-posterior(b0 = currentb0, 
+                            b1 = b1[i-1], 
+                            gluc = gluc,
+                            outcome = outcome)))
   #Determine if to accept b0.s value based on ln(r)
   if(log(runif(1)) < ln_r){
       b0[i] <- newb0      # accept move with probability min(1,r)
@@ -144,10 +182,18 @@ post_sample = function(initb0, initb1, gluc, outcome, nsample, JSD){
     #get the next random draw 
     newb1 <- currentb1 + rnorm(1, 0, (JSD/10)^2)
   #Complete ln(R) to determine if b0 candidate is to be accepted
-  ln_r <- (log(b0[i]) + log(newb1) + log(-posterior(b0=b0[i], b1=newb1, gluc = gluc, 
-                                              outcome = outcome))) - 
-          (log(b0[i]) + log(b1[i-1]) + log(-posterior(b0 = b0[i], b1 = b1[i-1], gluc = gluc,
-                                             outcome = outcome)))
+  ln_r <- (dnorm(b0[i], 0, 15, log = TRUE) + 
+             dnorm(newb1, 0, 15, log = TRUE) + 
+             log(-posterior(b0=b0[i], 
+                            b1=newb1, 
+                            gluc = gluc, 
+                            outcome = outcome))) - 
+          (dnorm(b0[i], 0, 15, log = TRUE) + 
+             dnorm(b1[i-1], 0, 15, log = TRUE) + 
+             log(-posterior(b0 = b0[i], 
+                              b1 = b1[i-1], 
+                              gluc = gluc,
+                              outcome = outcome)))
   #Determine if to accept b0.s value based on ln(r)
   if(log(runif(1)) < ln_r){
       b1[i] <- newb1      # accept move with probability min(1,r)
@@ -159,12 +205,13 @@ post_sample = function(initb0, initb1, gluc, outcome, nsample, JSD){
 }
 ```
 
-> Run the sampler function with a sample size of 6000 and a 'burn-in' of 1000.
+> Run the sampler function with a sample size of 6000.
 
 ```{r}
 result <- post_sample(initb0 = 0.1, initb1 = 0.1, gluc = d_data$Glucose,
-                     outcome = d_data$Outcome, nsample = 10, JSD = 0.2)
+                     outcome = d_data$Outcome, nsample = 6000, JSD = 0.2)
 
+head(result)
 ```
 
 > Identify a burnin in to reduce depdency on the first estimated values of b0 & b1,
@@ -172,7 +219,7 @@ result <- post_sample(initb0 = 0.1, initb1 = 0.1, gluc = d_data$Glucose,
 > generated distributions.
 
 ```{r}
-burnin <- 2
+burnin <- 1000
 
 m <- c(mean(result$Beta0[-c(1:burnin)]), mean(result$Beta1[-c(1:burnin)]))
 s <- c(sd(result$Beta0[-c(1:burnin)]), sd(result$Beta1[-c(1:burnin)]))
@@ -239,7 +286,8 @@ then plot against the reported diabetes status values.
 ```{r}
 comparison <- data.frame(
   'Glucose' = d_data$Glucose,
-  'Predicted Value' = posterior(b0 = mean(post$Beta0),b1 = mean(post$Beta1), gluc = d_data$Glucose, outcome = d_data$Outcome),
+  'Probability' = expit(mean(post$Beta0), mean(post$Beta1), d_data$Glucose),
+#  'Predicted Value' = 
   'Actual Value' = d_data$Outcome)
 
 head(comparison)
